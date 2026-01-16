@@ -1,0 +1,12 @@
+{
+  "action_extraction": [
+    {
+      "version": 1,
+      "prompt": "\n        Extract all action items from the meeting transcript.\n        An action item has: task, owner (speaker ID), due date (if mentioned), priority.\n        \n        Transcript:\n        {transcript}\n        \n        Return JSON list: [{{\"task\": \"...\", \"owner\": \"Speaker 1\", \"due\": \"YYYY-MM-DD\", \"priority\": \"high/medium/low\"}}]\n        If no due date, leave as null.\n        ",
+      "meta": {
+        "author": "system",
+        "description": "Initial version"
+      }
+    }
+  ]
+}
