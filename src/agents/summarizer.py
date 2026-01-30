@@ -10,9 +10,15 @@ class SummarizerAgent:
         """
         transcript: AssemblyAI response with utterances and speaker labels
         """
-        utterances = transcript['utterances']
+        if not isinstance(transcript, dict) or 'utterances' not in transcript:
+            return self._get_fallback_summary("Invalid transcript data provided.")
+
+        utterances = transcript.get('utterances', [])
+        if not utterances:
+             return self._get_fallback_summary("No speech detected in the audio file.")
+
         text_with_speakers = "\n".join([
-            f"Speaker {u['speaker']}: {u['text']}" for u in utterances
+            f"Speaker {u.get('speaker', 'Unknown')}: {u.get('text', '')}" for u in utterances
         ])
 
         prompt = f"""
@@ -31,4 +37,39 @@ class SummarizerAgent:
         Return JSON with keys: summary, topics, decisions, sentiment, speaker_roles.
         """
         response = self.llm.generate(prompt, task_type="summarization")
-        return json.loads(response["response"])
+        raw_content = response.get("response", "{}")
+        
+        try:
+            # Try to parse the response as JSON
+            data = json.loads(raw_content)
+            if isinstance(data, dict):
+                # Ensure all required keys exist
+                required_keys = ["summary", "topics", "decisions", "sentiment", "speaker_roles"]
+                for key in required_keys:
+                    if key not in data:
+                        data[key] = "N/A" if key in ["summary", "sentiment", "speaker_roles"] else []
+                return data
+            else:
+                return self._get_fallback_summary(f"LLM returned {type(data).__name__} instead of dictionary.")
+        except json.JSONDecodeError:
+            # If standard parsing fails, try to extract JSON from markdown blocks
+            import re
+            json_match = re.search(r'```json\n(.*?)\n```', raw_content, re.DOTALL)
+            if json_match:
+                try:
+                    data = json.loads(json_match.group(1))
+                    if isinstance(data, dict):
+                        return data
+                except json.JSONDecodeError:
+                    pass
+            
+            return self._get_fallback_summary("Could not parse JSON from LLM response.")
+
+    def _get_fallback_summary(self, error_msg: str) -> dict:
+        return {
+            "summary": f"Error: {error_msg}",
+            "topics": [],
+            "decisions": [],
+            "sentiment": "unknown",
+            "speaker_roles": "unknown"
+        }
